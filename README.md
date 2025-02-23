@@ -10,3 +10,17 @@ To run this file:
 4. Then run this command: python app.py
 
 ![image](https://github.com/user-attachments/assets/5a42b38e-cda9-4a48-9717-b88ee959fdfb)
+
+5. Then you can close the server: Ctrl + C and run command : python live.py
+   You can see real time simulation of World Cup 2022 Final Match of Argentina Vs France and see the tactics suggested by our AI when we click on the players.
+
+![image](https://github.com/user-attachments/assets/510faaaf-b35a-4e3a-90ac-cd9c5a928a65)
+
+6. CLose the server and Next command: python hmap.py
+    ![image](https://github.com/user-attachments/assets/fe7dbaba-41ef-478d-b0f6-82a0ebd8b281)
+   ![image](https://github.com/user-attachments/assets/2ed48d35-1c15-4fb2-b7e0-d321e40b9877)
+
+   ![image](https://github.com/user-attachments/assets/48ee5fc5-2254-45f4-8f93-9195e5e4daea)
+
+7. 
+
