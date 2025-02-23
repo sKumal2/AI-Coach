@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hackathon Project</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Our Hackathon Project</h1>
+        <p class="subtitle">Innovate. Create. Celebrate.</p>
+
+        <div class="features">
+            {% for feature in features %}
+            <div class="feature-card">
+                <h2>{{ feature.title }}</h2>
+                <p>{{ feature.description }}</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <a href="{{ url_for('app_page') }}" class="btn">Try Our App</a>
+    </div>
+</body>
+</html>
