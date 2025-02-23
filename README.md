@@ -22,5 +22,9 @@ To run this file:
 
    ![image](https://github.com/user-attachments/assets/48ee5fc5-2254-45f4-8f93-9195e5e4daea)
 
-7. 
+7. Again close the server and enter next command : python post.py
+   ![image](https://github.com/user-attachments/assets/2bd763e1-d189-4e7d-831f-fadf62e28de3)  ![image](https://github.com/user-attachments/assets/f07d918d-c45a-4613-8ef6-89dae58a4872)
+
+   
+
 
