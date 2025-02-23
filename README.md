@@ -14,7 +14,8 @@ To run this repo:
 5. Then you can close the server: Ctrl + C and run command : python live.py
    You can see real time simulation of World Cup 2022 Final Match of Argentina Vs France and see the tactics suggested by our AI when we click on the players.
 
-![image](https://github.com/user-attachments/assets/510faaaf-b35a-4e3a-90ac-cd9c5a928a65)
+![image](https://github.com/user-attachments/assets/7f48e70f-b11e-44e7-ae1e-1a361fe80708)
+
 
 6. CLose the server and Next command: python hmap.py
     ![image](https://github.com/user-attachments/assets/fe7dbaba-41ef-478d-b0f6-82a0ebd8b281)
