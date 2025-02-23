@@ -185,43 +185,57 @@ def get_player_bounds(player):
             return (0, 52.5, 0, 68)
 
 def update_player_positions(n):
-    """Update player positions based on current event and role-based random movement."""
+    """Update player positions smoothly with occasional aggressive movement."""
     current_event = events.iloc[n % len(events)]
-    
+    smoothing_factor = 0.3  # Adjust for smoother transitions (0 to 1, lower = smoother)
+    aggressive_chance = 0.2  # 20% chance for aggressive movement
+
     # Players to update based on event
     players_to_set = []
     if 'player_id' in current_event and current_event['player_id'] in player_id_to_name:
         player_name = player_id_to_name[current_event['player_id']]
         if player_name in player_positions and 'location' in current_event:
             sb_x, sb_y = current_event['location']
-            dashboard_x, dashboard_y = convert_coords(sb_x, sb_y)
-            player_positions[player_name] = (dashboard_x, dashboard_y)
+            target_x, target_y = convert_coords(sb_x, sb_y)
+            x, y = player_positions[player_name]
+            # Smoothly interpolate toward event location
+            new_x = x + smoothing_factor * (target_x - x)
+            new_y = y + smoothing_factor * (target_y - y)
+            player_positions[player_name] = (new_x, new_y)
             players_to_set.append(player_name)
-    
+
     if current_event['type'] == 'Pass' and 'pass_recipient_id' in current_event:
         recipient_id = current_event['pass_recipient_id']
         if recipient_id in player_id_to_name:
             recipient_name = player_id_to_name[recipient_id]
             if recipient_name in player_positions and 'pass_end_location' in current_event:
                 sb_x, sb_y = current_event['pass_end_location']
-                dashboard_x, dashboard_y = convert_coords(sb_x, sb_y)
-                player_positions[recipient_name] = (dashboard_x, dashboard_y)
+                target_x, target_y = convert_coords(sb_x, sb_y)
+                x, y = player_positions[recipient_name]
+                # Smoothly interpolate toward pass end location
+                new_x = x + smoothing_factor * (target_x - x)
+                new_y = y + smoothing_factor * (target_y - y)
+                player_positions[recipient_name] = (new_x, new_y)
                 players_to_set.append(recipient_name)
-    
-    # Add random movement for other players within their bounds
+
+    # Add smooth random movement for other players with occasional aggressive bursts
     for player in player_positions:
         if player not in players_to_set:
             x, y = player_positions[player]
             role = player_roles[player]
-            # Smaller movement for goalkeepers
-            if role == 'GK':
-                dx = random.uniform(-0.5, 0.5)
-                dy = random.uniform(-0.5, 0.5)
+            # Occasionally increase movement for non-GK players to simulate aggression
+            if role != 'GK' and random.random() < aggressive_chance:
+                dx = random.uniform(-2.0, 2.0)  # Larger, aggressive movement
+                dy = random.uniform(-2.0, 2.0)
             else:
-                dx = random.uniform(-1, 1)
-                dy = random.uniform(-1, 1)
-            new_x = x + dx
-            new_y = y + dy
+                # Normal smooth movement
+                dx = random.uniform(-0.2, 0.2) if role == 'GK' else random.uniform(-0.5, 0.5)
+                dy = random.uniform(-0.2, 0.2) if role == 'GK' else random.uniform(-0.5, 0.5)
+            target_x = x + dx
+            target_y = y + dy
+            # Smoothly interpolate toward random target
+            new_x = x + smoothing_factor * (target_x - x)
+            new_y = y + smoothing_factor * (target_y - y)
             # Clip to role-specific bounds
             x_min, x_max, y_min, y_max = get_player_bounds(player)
             new_x = max(x_min, min(new_x, x_max))
@@ -234,6 +248,7 @@ def ai_tactic_and_position(player, team):
     role = player_roles[player]
     player_data = player_past_stats.get(player, {})
     team_data = teams_df[teams_df['Team'] == team].iloc[0]
+    x, y = player_positions[player]  # Current position
 
     # Determine optimal position based on role and team
     if role == 'FWD':
@@ -259,27 +274,102 @@ def ai_tactic_and_position(player, team):
         else:
             optimal_x, optimal_y = 100, 34  # Near France's goal
 
-    # Role-based tactical suggestion with xG differential context
+    # Role-based tactical suggestions (10+ per role)
     if role == 'FWD':
         if team_data['xG_Differential'] > 0.5:
-            tactic = f"Push aggressively toward the high-threat zone at ({optimal_x:.1f}, {optimal_y:.1f}). Your team’s dominance (xG diff {team_data['xG_Differential']:.2f}) means their backline is vulnerable—exploit gaps with quick runs and clinical finishing."
+            if x < optimal_x - 10:
+                tactic = f"Surge forward to ({optimal_x:.1f}, {optimal_y:.1f}). Your team’s lead (xG diff {team_data['xG_Differential']:.2f}) opens gaps—exploit them with pace."
+            elif abs(y - 34) > 15:
+                tactic = f"Cut inside to ({optimal_x:.1f}, {optimal_y:.1f}). Dominance (xG diff {team_data['xG_Differential']:.2f}) lets you attack centrally—unleash a shot."
+            elif x > 85:
+                tactic = f"Hold position near ({optimal_x:.1f}, {optimal_y:.1f}). With xG lead ({team_data['xG_Differential']:.2f}), draw defenders out for teammates."
+            elif random.random() < 0.3:
+                tactic = f"Drop back slightly from ({x:.1f}, {y:.1f}) to link play. Your edge (xG diff {team_data['xG_Differential']:.2f}) allows space creation."
+            else:
+                tactic = f"Push to ({optimal_x:.1f}, {optimal_y:.1f}). Team’s dominance (xG diff {team_data['xG_Differential']:.2f})—finish clinically in the box."
         else:
-            tactic = f"Advance cautiously to the prime scoring area at ({optimal_x:.1f}, {optimal_y:.1f}). The match is tight (xG diff {team_data['xG_Differential']:.2f})—hold position, wait for defensive lapses, and strike decisively."
+            if x < optimal_x - 10:
+                tactic = f"Advance cautiously to ({optimal_x:.1f}, {optimal_y:.1f}). Tight game (xG diff {team_data['xG_Differential']:.2f})—wait for openings."
+            elif abs(y - 34) > 15:
+                tactic = f"Drift to ({optimal_x:.1f}, {optimal_y:.1f}). Close match (xG diff {team_data['xG_Differential']:.2f})—exploit wide gaps."
+            elif x > 85:
+                tactic = f"Stay near ({optimal_x:.1f}, {optimal_y:.1f}). Even contest (xG diff {team_data['xG_Differential']:.2f})—hold for a counter."
+            elif random.random() < 0.3:
+                tactic = f"Track back from ({x:.1f}, {y:.1f}) to support. Tight (xG diff {team_data['xG_Differential']:.2f})—help midfield."
+            else:
+                tactic = f"Move to ({optimal_x:.1f}, {optimal_y:.1f}). Balanced game (xG diff {team_data['xG_Differential']:.2f})—strike when ready."
+
     elif role == 'DEF':
         if team_data['xG_Differential'] > 0.5:
-            tactic = f"Anchor the backline at the opponent’s danger zone ({optimal_x:.1f}, {optimal_y:.1f}). With a strong xG lead ({team_data['xG_Differential']:.2f}), press higher to disrupt their rhythm and intercept loose balls."
+            if x > optimal_x + 10:
+                tactic = f"Push up to ({optimal_x:.1f}, {optimal_y:.1f}). Lead (xG diff {team_data['xG_Differential']:.2f})—press their forwards high."
+            elif abs(y - optimal_y) > 10:
+                tactic = f"Shift to ({optimal_x:.1f}, {optimal_y:.1f}). Advantage (xG diff {team_data['xG_Differential']:.2f})—cover wide threats."
+            elif x < 20:
+                tactic = f"Hold at ({x:.1f}, {y:.1f}). Strong xG ({team_data['xG_Differential']:.2f})—block counters early."
+            elif random.random() < 0.3:
+                tactic = f"Step up from ({x:.1f}, {y:.1f}) to intercept. Lead (xG diff {team_data['xG_Differential']:.2f})—disrupt their rhythm."
+            else:
+                tactic = f"Anchor at ({optimal_x:.1f}, {optimal_y:.1f}). Edge (xG diff {team_data['xG_Differential']:.2f})—lock down the danger zone."
         else:
-            tactic = f"Guard the critical area at ({optimal_x:.1f}, {optimal_y:.1f}) tightly. The game’s close (xG diff {team_data['xG_Differential']:.2f})—stay compact, mark runners, and block shots to protect the goal."
+            if x > optimal_x + 10:
+                tactic = f"Drop to ({optimal_x:.1f}, {optimal_y:.1f}). Tight (xG diff {team_data['xG_Differential']:.2f})—stay compact."
+            elif abs(y - optimal_y) > 10:
+                tactic = f"Adjust to ({optimal_x:.1f}, {optimal_y:.1f}). Close (xG diff {team_data['xG_Differential']:.2f})—mark wingers."
+            elif x < 20:
+                tactic = f"Stay deep at ({x:.1f}, {y:.1f}). Even (xG diff {team_data['xG_Differential']:.2f})—protect the box."
+            elif random.random() < 0.3:
+                tactic = f"Hold position at ({x:.1f}, {y:.1f}). Tight (xG diff {team_data['xG_Differential']:.2f})—watch for runners."
+            else:
+                tactic = f"Guard ({optimal_x:.1f}, {optimal_y:.1f}). Close game (xG diff {team_data['xG_Differential']:.2f})—block shots."
+
     elif role == 'MID':
         if team_data['xG_Differential'] > 0.5:
-            tactic = f"Dominate the central pitch at ({optimal_x:.1f}, {optimal_y:.1f}). Your team’s edge (xG diff {team_data['xG_Differential']:.2f}) allows you to dictate tempo—push forward, connect attackers, and stretch their midfield."
+            if x < 40:
+                tactic = f"Push to ({optimal_x:.1f}, {optimal_y:.1f}). Lead (xG diff {team_data['xG_Differential']:.2f})—drive play forward."
+            elif abs(y - 34) > 20:
+                tactic = f"Move to ({optimal_x:.1f}, {optimal_y:.1f}). Edge (xG diff {team_data['xG_Differential']:.2f})—exploit wide spaces."
+            elif x > 70:
+                tactic = f"Support attack at ({optimal_x:.1f}, {optimal_y:.1f}). Lead (xG diff {team_data['xG_Differential']:.2f})—feed forwards."
+            elif random.random() < 0.3:
+                tactic = f"Drop to ({x:.1f}, {y:.1f}) to recycle. Advantage (xG diff {team_data['xG_Differential']:.2f})—keep possession."
+            else:
+                tactic = f"Control ({optimal_x:.1f}, {optimal_y:.1f}). Dominance (xG diff {team_data['xG_Differential']:.2f})—stretch their midfield."
         else:
-            tactic = f"Hold the midfield pivot at ({optimal_x:.1f}, {optimal_y:.1f}). It’s a tight contest (xG diff {team_data['xG_Differential']:.2f})—shield the defense, recycle possession, and break their pressing lines."
+            if x < 40:
+                tactic = f"Advance to ({optimal_x:.1f}, {optimal_y:.1f}). Tight (xG diff {team_data['xG_Differential']:.2f})—link defense and attack."
+            elif abs(y - 34) > 20:
+                tactic = f"Shift to ({optimal_x:.1f}, {optimal_y:.1f}). Close (xG diff {team_data['xG_Differential']:.2f})—cover flanks."
+            elif x > 70:
+                tactic = f"Hold at ({optimal_x:.1f}, {optimal_y:.1f}). Even (xG diff {team_data['xG_Differential']:.2f})—support counters."
+            elif random.random() < 0.3:
+                tactic = f"Stay at ({x:.1f}, {y:.1f}) to shield. Tight (xG diff {team_data['xG_Differential']:.2f})—break their press."
+            else:
+                tactic = f"Pivot at ({optimal_x:.1f}, {optimal_y:.1f}). Close game (xG diff {team_data['xG_Differential']:.2f})—maintain balance."
+
     elif role == 'GK':
         if team_data['xG_Differential'] > 0.5:
-            tactic = f"Command the box from ({optimal_x:.1f}, {optimal_y:.1f}). With the team ahead (xG diff {team_data['xG_Differential']:.2f}), initiate play confidently—distribute accurately to start attacks and keep pressure off the defense."
+            if x > 10 and team == 'Argentina':
+                tactic = f"Move to ({optimal_x:.1f}, {optimal_y:.1f}). Lead (xG diff {team_data['xG_Differential']:.2f})—play out confidently."
+            elif x < 95 and team == 'France':
+                tactic = f"Shift to ({optimal_x:.1f}, {optimal_y:.1f}). Edge (xG diff {team_data['xG_Differential']:.2f})—start attacks."
+            elif abs(y - 34) > 5:
+                tactic = f"Adjust to ({optimal_x:.1f}, {optimal_y:.1f}). Lead (xG diff {team_data['xG_Differential']:.2f})—cover angles."
+            elif random.random() < 0.3:
+                tactic = f"Stay at ({x:.1f}, {y:.1f}) to organize. Advantage (xG diff {team_data['xG_Differential']:.2f})—direct defense."
+            else:
+                tactic = f"Command ({optimal_x:.1f}, {optimal_y:.1f}). Dominance (xG diff {team_data['xG_Differential']:.2f})—distribute accurately."
         else:
-            tactic = f"Stay vigilant at ({optimal_x:.1f}, {optimal_y:.1f}). The match is close (xG diff {team_data['xG_Differential']:.2f})—organize the backline, anticipate crosses, and make critical saves to keep us in contention."
+            if x > 10 and team == 'Argentina':
+                tactic = f"Drop to ({optimal_x:.1f}, {optimal_y:.1f}). Tight (xG diff {team_data['xG_Differential']:.2f})—stay alert."
+            elif x < 95 and team == 'France':
+                tactic = f"Move to ({optimal_x:.1f}, {optimal_y:.1f}). Close (xG diff {team_data['xG_Differential']:.2f})—anticipate shots."
+            elif abs(y - 34) > 5:
+                tactic = f"Shift to ({optimal_x:.1f}, {optimal_y:.1f}). Even (xG diff {team_data['xG_Differential']:.2f})—watch crosses."
+            elif random.random() < 0.3:
+                tactic = f"Hold at ({x:.1f}, {y:.1f}) to organize. Tight (xG diff {team_data['xG_Differential']:.2f})—keep defense tight."
+            else:
+                tactic = f"Guard ({optimal_x:.1f}, {optimal_y:.1f}). Close game (xG diff {team_data['xG_Differential']:.2f})—make key saves."
 
     # Player-specific advice based on stats
     if player_data.get('goals', 0) > 2:
@@ -375,7 +465,11 @@ app.layout = html.Div([
                      style={'border': '2px solid #333', 'padding': '15px', 'backgroundColor': '#f9f9f9',
                             'borderRadius': '10px', 'boxShadow': '2px 2px 8px rgba(0,0,0,0.1)'})
         ], style={'width': '23%', 'display': 'inline-block', 'marginLeft': '2%', 'verticalAlign': 'top'})
-    ])
+    ]),
+    html.Div([
+        html.Span("Argentina", style={'color': 'blue', 'fontSize': '20px', 'position': 'absolute', 'left': '10%', 'bottom': '5px'}),
+        html.Span("France", style={'color': 'red', 'fontSize': '20px', 'position': 'absolute', 'right': '45%', 'bottom': '5px'})
+    ], style={'position': 'relative', 'height': '40px'})
 ], style={'padding': '20px'})
 
 # -------------------------
