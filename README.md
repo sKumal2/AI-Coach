@@ -7,7 +7,7 @@ To run this repo:
 2. Install required python packages
     pip install flask, dash, numpy, plotly, pandas, scikit-learn, statsbombpy, matplotlib, seaborn, base64, mplsoccer
 
-3. GO to terminal in vs code and change directory to AI-Coach
+3. GO to the terminal in vs code and change directory to AI-Coach
 
 4. Then run this command: python app.py
 
