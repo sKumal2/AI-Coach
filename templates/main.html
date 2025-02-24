@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>2026 Coach - Match Insights</title>
+
+    <style>
+
+        .minute-list { max-height: 400px; overflow-y: scroll; }
+
+    </style>
+
+</head>
+
+<body>
+
+    <h1>Welcome, 2026 Coach!</h1>
+
+    <p>Select a minute to view tactical insights for Argentina vs. France (2022 WC Final):</p>
+
+    <div class="minute-list">
+
+        <ul>
+
+            {% for minute in intervals %}
+
+                <li><a href="/insights/{{ minute }}">{{ minute }} minutes</a></li>
+
+            {% endfor %}
+
+        </ul>
+
+    </div>
+
+</body>
+
+</html>
