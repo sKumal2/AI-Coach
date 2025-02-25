@@ -1,5 +1,5 @@
 from flask import Flask, render_template
-import heat_map_players
+import hmap
 
 app = Flask(__name__)
 
@@ -14,6 +14,7 @@ def home():
         return render_template('index.html', features=features)
 
 @app.route('/app')
+
 def app_page():
     return render_template('app_page.html')
 
